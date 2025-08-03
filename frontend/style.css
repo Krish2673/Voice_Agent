@@ -1,0 +1,29 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: black;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.heading {
+    color: aliceblue;
+}
+
+.alert_btn {
+    padding: 0.3rem;
+    border: 2px solid rgb(40, 204, 51);
+    border-radius: 9px;
+    background-color: aqua;
+    margin-top: 1rem;
+}
+.alert_btn:hover{
+    cursor: pointer;
+}
