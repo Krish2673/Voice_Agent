@@ -4,11 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Agent</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
     <h1 class="heading">Hello, from Voice Agent!</h1>
-    <button onclick="showMsg()" class="alert_btn">Welcome</button>
+
+    <form class="tts">
+        <input type="text" id="ip_text" placeholder="Enter text..." required />
+        <button type="submit" id="generate_btn">Generate Audio</button>
+    </form>
+
+    <audio id="audioPlayer" controls></audio>
 
     <script src="/static/script.js"></script>
 </body>

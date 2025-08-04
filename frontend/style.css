@@ -17,13 +17,39 @@ body {
     color: aliceblue;
 }
 
-.alert_btn {
-    padding: 0.3rem;
-    border: 2px solid rgb(40, 204, 51);
+.tts {
+    display: flex;
+    padding: 1rem;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+#ip_text {
+    border: 3px solid aquamarine;
+    border-radius: 7px ;
+    height: 2.3rem;
+    width: 11rem;
+    padding: 0.4rem;    
+    color: black;
+    font-weight: 600;
+}
+
+#generate_btn{
+    padding: 0.5rem;
+    border: 2px solid aquamarine;
     border-radius: 9px;
     background-color: aqua;
-    margin-top: 1rem;
+    font-size: 0.9rem;
 }
-.alert_btn:hover{
+
+#generate_btn:hover{
     cursor: pointer;
+}
+
+#audioPlayer {
+    margin-top: 0.7rem;
+    width: 250px;
+    border: 3px solid aquamarine;
+    border-radius: 30px;
+    display: none;
 }
