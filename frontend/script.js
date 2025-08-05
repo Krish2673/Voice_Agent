@@ -1,4 +1,9 @@
-const Generate_btn = document.getElementById('generate_btn')
+const Generate_btn = document.getElementById('generate_btn');
+
+const startBtn = document.getElementById('start-btn');
+const stopBtn = document.getElementById('stop-btn');
+const playback = document.getElementById('echoPlayer');
+const resetBtn = document.getElementById('reset-btn');
 
 Generate_btn.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -39,4 +44,63 @@ Generate_btn.addEventListener('click', async (e) => {
         console.error("Error: ", error);
         alert("Something went wrong. Please try again!")
     }
-})
+});
+
+let mediaRecorder;
+let audioChunks = [];
+
+startBtn.addEventListener('click', async() => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        document.getElementById('record-indicator').style.display = 'block';
+
+        mediaRecorder.ondataavailable = event => {
+            if(event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
+            const audioUrl = URL.createObjectURL(audioBlob);
+            playback.src = audioUrl;
+            playback.style.display = "block";
+            resetBtn.disabled = false;
+            resetBtn.style.cursor = "pointer";
+            document.getElementById('record-indicator').style.display = 'none';
+        };
+
+        mediaRecorder.start();
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        stopBtn.style.cursor = "pointer";
+    }
+    catch (error){
+        console.error("Microphone access denied or error ocurred:", error);
+        alert("Microphone access is required to use Echo Bot!");
+    }
+});
+
+stopBtn.addEventListener('click', () => {
+    if(mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    }
+});
+
+resetBtn.addEventListener('click', () => {
+    audioChunks = [];
+    playback.src = "";
+    playback.style.display = "none";
+    resetBtn.disabled = true;
+    resetBtn.style.cursor = "not-allowed";
+    document.getElementById('record-indicator').style.display = 'none';
+    stopBtn.disabled = true;
+    stopBtn.style.cursor = "not-allowed";
+});

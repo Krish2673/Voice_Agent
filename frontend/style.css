@@ -34,7 +34,7 @@ body {
     font-weight: 600;
 }
 
-#generate_btn{
+.btns{
     padding: 0.5rem;
     border: 2px solid aquamarine;
     border-radius: 9px;
@@ -42,7 +42,7 @@ body {
     font-size: 0.9rem;
 }
 
-#generate_btn:hover{
+.btns:hover{
     cursor: pointer;
 }
 
@@ -52,4 +52,51 @@ body {
     border: 3px solid aquamarine;
     border-radius: 30px;
     display: none;
+}
+
+#echoPlayer {
+    margin-top: 1.2rem;
+    width: 250px;
+    border: 3px solid aquamarine;
+    border-radius: 30px;
+    display: none;
+}
+
+.echoHead {
+    color: aliceblue;
+}
+
+#stop-btn {
+    cursor: not-allowed;
+}
+
+.echoBot {
+    display: flex;
+    gap: 1.5rem;
+    margin: 1rem;
+}
+
+#reset-btn {
+    cursor: not-allowed;
+}
+
+#record-indicator {
+    display: none;
+    color: red;
+    font-weight: bold;
+    margin: 1rem;
+}
+
+.section-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid aquamarine;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem;
+    background-color: #292828;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+    width: 420px;
 }

@@ -7,14 +7,30 @@
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-    <h1 class="heading">Hello, from Voice Agent!</h1>
+    <div class="section-box" id="tts-box">
+        <h1 class="heading">Text to Speech Generator</h1>
+    
+        <form class="tts">
+            <input type="text" id="ip_text" placeholder="Enter text..." required />
+            <button class = "btns" type="submit" id="generate_btn">Generate Audio</button>
+        </form>
+    
+        <audio id="audioPlayer" controls></audio>
+    </div>
 
-    <form class="tts">
-        <input type="text" id="ip_text" placeholder="Enter text..." required />
-        <button type="submit" id="generate_btn">Generate Audio</button>
-    </form>
-
-    <audio id="audioPlayer" controls></audio>
+    <div class="section-box" id="echo-box">
+        <h1 class="echoHead">Echo Bot</h1>
+    
+        <div class="echoBot">
+            <button class="btns" id="start-btn">Start Recording</button>
+            <button class="btns" id="stop-btn" disabled>Stop Recording</button>
+        </div>
+    
+        <button class="btns" id="reset-btn" disabled>Reset</button>
+    
+        <audio id="echoPlayer" controls></audio>
+        <div id="record-indicator">Recording...</div>
+    </div>
 
     <script src="/static/script.js"></script>
 </body>
