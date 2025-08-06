@@ -5,7 +5,7 @@
 }
 
 body {
-    background-color: black;
+    background: linear-gradient(135deg, #111, #333);
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -84,7 +84,7 @@ body {
     display: none;
     color: red;
     font-weight: bold;
-    margin: 1rem;
+    margin-top: 1rem;
 }
 
 .section-box {
@@ -99,4 +99,11 @@ body {
     background-color: #292828;
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
     width: 420px;
+}
+
+#status{
+    margin-top: 1rem;
+    font-weight: bold;
+    color: green;
+    display: none;
 }

@@ -1,12 +1,16 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from murf import Murf
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
 load_dotenv()
+
+uploadDIR = Path("uploads")
+uploadDIR.mkdir(exist_ok = True)
 
 app = FastAPI()
 
@@ -19,7 +23,7 @@ async def get_index():
 
 class TTSRequest(BaseModel):
     text: str
-    voice_id: str = "en-US-terrell" 
+    voice_id: str = "en-US-terrell"
 
 @app.post("/generate-audio")
 async def generate_audio(payload: TTSRequest):
@@ -29,3 +33,17 @@ async def generate_audio(payload: TTSRequest):
         voice_id=payload.voice_id
     )
     return {"audio_url": res.audio_file}
+
+@app.post("/upload-audio")
+async def upload_audio(file : UploadFile = File(...)):
+    file_path = uploadDIR/file.filename
+
+    with open(file_path,"wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    return {
+        "filename" : file.filename,
+        "content_type" : file.content_type,
+        "size_kb" : round(len(content)/1024,2)
+    }

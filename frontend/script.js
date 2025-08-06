@@ -5,6 +5,8 @@ const stopBtn = document.getElementById('stop-btn');
 const playback = document.getElementById('echoPlayer');
 const resetBtn = document.getElementById('reset-btn');
 
+const statusDiv = document.getElementById('status');
+
 Generate_btn.addEventListener('click', async (e) => {
     e.preventDefault();
     const textIP = document.getElementById('ip_text').value;
@@ -67,11 +69,16 @@ startBtn.addEventListener('click', async() => {
         mediaRecorder.onstop = () => {
             const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
             const audioUrl = URL.createObjectURL(audioBlob);
+
             playback.src = audioUrl;
-            playback.style.display = "block";
+            // playback.style.display = "block";
+
             resetBtn.disabled = false;
             resetBtn.style.cursor = "pointer";
+
             document.getElementById('record-indicator').style.display = 'none';
+            
+            uploadAudio(audioBlob);
         };
 
         mediaRecorder.start();
@@ -103,4 +110,36 @@ resetBtn.addEventListener('click', () => {
     document.getElementById('record-indicator').style.display = 'none';
     stopBtn.disabled = true;
     stopBtn.style.cursor = "not-allowed";
+    statusDiv.innerHTML = "";
+    statusDiv.style.display = "none";
 });
+
+async function uploadAudio(blob) {
+    statusDiv.textContent = "Uploading...";
+
+    const formData = new FormData();
+    formData.append("file",blob,"recording.wav");
+
+    try {
+        const response = await fetch("/upload-audio", {
+            method : "POST",
+            body : formData
+        })
+
+        if(!response.ok) {
+            throw new Error(`Upload Failed: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        statusDiv.style.display = "block";
+        statusDiv.innerHTML = `
+        ✅ Upload successful <br>
+        Name : ${result.filename} <br>
+        Type : ${result.content_type} <br>
+        Size : ${result.size_kb} KB`;
+    }
+    catch(error) {
+        statusDiv.textContent = `❌ Upload failed: " ${error.message}`;
+    }
+}
