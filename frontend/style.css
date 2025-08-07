@@ -56,10 +56,10 @@ body {
 
 #echoPlayer {
     margin-top: 1.2rem;
-    width: 250px;
+    width: 275px;
     border: 3px solid aquamarine;
     border-radius: 30px;
-    display: none;
+    /* display: none; */
 }
 
 .echoHead {
@@ -106,4 +106,21 @@ body {
     font-weight: bold;
     color: green;
     display: none;
+}
+
+#transcript {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+#transHead {
+    color: aliceblue;
+    margin: 1rem;
+    display: none;
+}
+
+#transcription {
+    color: azure;
 }

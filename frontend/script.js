@@ -2,10 +2,15 @@ const Generate_btn = document.getElementById('generate_btn');
 
 const startBtn = document.getElementById('start-btn');
 const stopBtn = document.getElementById('stop-btn');
-const playback = document.getElementById('echoPlayer');
 const resetBtn = document.getElementById('reset-btn');
 
+const playback = document.getElementById('echoPlayer');
+const recorder = document.getElementById('record-indicator');
+
 const statusDiv = document.getElementById('status');
+
+const transcriptContainer = document.getElementById('transHead');
+const Transcript = document.getElementById("transcription");
 
 Generate_btn.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -58,7 +63,8 @@ startBtn.addEventListener('click', async() => {
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
-        document.getElementById('record-indicator').style.display = 'block';
+        recorder.style.display = 'block';
+        startBtn.style.cursor = "not-allowed";
 
         mediaRecorder.ondataavailable = event => {
             if(event.data.size > 0) {
@@ -71,12 +77,11 @@ startBtn.addEventListener('click', async() => {
             const audioUrl = URL.createObjectURL(audioBlob);
 
             playback.src = audioUrl;
-            // playback.style.display = "block";
 
             resetBtn.disabled = false;
             resetBtn.style.cursor = "pointer";
 
-            document.getElementById('record-indicator').style.display = 'none';
+            recorder.style.display = 'none';
             
             uploadAudio(audioBlob);
         };
@@ -96,22 +101,30 @@ startBtn.addEventListener('click', async() => {
 stopBtn.addEventListener('click', () => {
     if(mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
+
         startBtn.disabled = false;
+        startBtn.style.cursor = "pointer";
+
         stopBtn.disabled = true;
+        stopBtn.style.cursor = "not-allowed";
     }
 });
 
 resetBtn.addEventListener('click', () => {
     audioChunks = [];
     playback.src = "";
-    playback.style.display = "none";
+
     resetBtn.disabled = true;
     resetBtn.style.cursor = "not-allowed";
-    document.getElementById('record-indicator').style.display = 'none';
+
     stopBtn.disabled = true;
     stopBtn.style.cursor = "not-allowed";
+
     statusDiv.innerHTML = "";
     statusDiv.style.display = "none";
+
+    transcriptContainer.style.display = "none";
+    Transcript.textContent = "";
 });
 
 async function uploadAudio(blob) {
@@ -138,8 +151,38 @@ async function uploadAudio(blob) {
         Name : ${result.filename} <br>
         Type : ${result.content_type} <br>
         Size : ${result.size_kb} KB`;
+
+        await transcribeAudio(blob);
     }
     catch(error) {
         statusDiv.textContent = `❌ Upload failed: " ${error.message}`;
+    }
+}
+
+async function transcribeAudio(file) {
+    transcriptContainer.style.display = "block";
+    Transcript.textContent = "Transcribing...";
+
+    const formData = new FormData();
+    formData.append("file",file);
+
+    try {
+        const res = await fetch("/transcribe/file", {
+            method : "POST",
+            body : formData,
+        });
+
+
+        if(!res.ok) {
+            throw new Error(`Failed to Transcribe ${res.status}`);
+        }
+
+        const data = await res.json();
+        const transcriptionText = data.transcript;
+
+        Transcript.textContent = transcriptionText || "No transcript available.";
+    }
+    catch(err) {
+        Transcript.textContent = `❌ Error: ${err.message}`;
     }
 }
