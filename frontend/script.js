@@ -83,7 +83,7 @@ startBtn.addEventListener('click', async() => {
 
             recorder.style.display = 'none';
             
-            uploadAudio(audioBlob);
+            echoWithMurf(audioBlob);
         };
 
         mediaRecorder.start();
@@ -184,5 +184,40 @@ async function transcribeAudio(file) {
     }
     catch(err) {
         Transcript.textContent = `❌ Error: ${err.message}`;
+    }
+}
+
+async function echoWithMurf(blob) {
+    statusDiv.style.display = "block";
+    statusDiv.textContent = "Processing with Murf...";
+
+    const formData = new FormData();
+    formData.append("file",blob,"recording.wav");
+
+    try {
+        const response = await fetch("/tts/echo", {
+            method : "POST",
+            body : formData
+        });
+
+        if(!response.ok) {
+            throw new Error(`Echo failed : ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        transcriptContainer.style.display = "block";
+        Transcript.textContent = data.transcript || "No transcript available.";
+
+        playback.src = data.audio_url;
+        playback.load();
+        playback.play();
+
+        statusDiv.textContent = "✅ Murf echo complete!";
+
+    }   
+
+    catch(err) {
+        statusDiv.textContent = `❌ Error: ${err.message}`;
     }
 }

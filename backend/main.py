@@ -58,3 +58,18 @@ async def transcribe_file(file : UploadFile = File(...)):
     transcript = transcriber.transcribe(file_content)
 
     return JSONResponse(content = {"transcript" : transcript.text})
+
+@app.post("/tts/echo")
+async def tts_echo(file : UploadFile = File(...)):
+    file_content = await file.read()
+
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(file_content)
+    text = transcript.text
+
+    client = Murf(api_key = os.getenv("MURF_API_KEY"))
+    res = client.text_to_speech.generate(
+        text = text,
+        voice_id = "en-US-terrell"
+    )
+    return {"audio_url" : res.audio_file, "transcript" : text}
