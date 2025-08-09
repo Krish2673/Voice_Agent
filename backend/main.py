@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 from pathlib import Path
 import assemblyai as aai
+from google import genai
 
 load_dotenv()
 
@@ -73,3 +74,20 @@ async def tts_echo(file : UploadFile = File(...)):
         voice_id = "en-US-terrell"
     )
     return {"audio_url" : res.audio_file, "transcript" : text}
+
+class LLMRequest(BaseModel):
+    prompt:str
+
+@app.post("/llm/query")
+async def llm_query(payload : LLMRequest):
+    try:
+        client = genai.Client()
+        response = client.models.generate_content(
+            model = "gemini-2.5-flash",
+            contents = payload.prompt 
+        )
+
+        return JSONResponse(content = {"response" : response.text})
+    
+    except Exception as e:
+        return JSONResponse(content = {"error" : str(e)}, status_code = 500)
