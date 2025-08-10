@@ -79,15 +79,32 @@ class LLMRequest(BaseModel):
     prompt:str
 
 @app.post("/llm/query")
-async def llm_query(payload : LLMRequest):
+async def llm_query(file : UploadFile = File(...)):
     try:
-        client = genai.Client()
+        file_content = await file.read()    #read audio file
+
+        transcriber = aai.Transcriber()         #Transcribe using Assesmbly AI
+        transcript = transcriber.transcribe(file_content)
+        user_text = transcript.text
+
+        client = genai.Client(api_key = os.getenv("Gemini_API_KEY"))        #Send Transcription to Gemini LLM
         response = client.models.generate_content(
             model = "gemini-2.5-flash",
-            contents = payload.prompt 
+            contents = user_text 
+        )
+        llm_text = response.text
+
+        murf_client = Murf(api_key = os.getenv("MURF_API_KEY"))         # Send LLM Response to Murf tts
+        murf_res = murf_client.text_to_speech.generate(
+            text = llm_text,
+            voice_id = "en-US-terrell"
         )
 
-        return JSONResponse(content = {"response" : response.text})
+        return JSONResponse(content = {                     # return text + audio
+            "user_transcript" : user_text,
+            "llm_text" : llm_text,
+            "audio_url" : murf_res.audio_file
+        })
     
     except Exception as e:
         return JSONResponse(content = {"error" : str(e)}, status_code = 500)

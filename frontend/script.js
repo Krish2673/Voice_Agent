@@ -83,7 +83,7 @@ startBtn.addEventListener('click', async() => {
 
             recorder.style.display = 'none';
             
-            echoWithMurf(audioBlob);
+            askLLMWithMurf(audioBlob);
         };
 
         mediaRecorder.start();
@@ -216,6 +216,40 @@ async function echoWithMurf(blob) {
         statusDiv.textContent = "✅ Murf echo complete!";
 
     }   
+
+    catch(err) {
+        statusDiv.textContent = `❌ Error: ${err.message}`;
+    }
+}
+
+async function askLLMWithMurf(blob) {
+    statusDiv.style.display = "block";
+    statusDiv.textContent = "Processing with Gemini + Murf";
+
+    const formData = new FormData();
+    formData.append("file",blob,"recording.wav");
+
+    try {
+        const response = await fetch("/llm/query", {
+            method : "POST",
+            body : formData
+        });
+
+        if(!response.ok) {
+            throw new Error(`LLM Voice Query Failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        transcriptContainer.style.display = "block";
+        Transcript.textContent = `You: ${data.user_transcript}\n\nLLM: ${data.llm_text}`;
+
+        playback.src = data.audio_url;
+        playback.load();
+        playback.play();
+
+        statusDiv.textContent = `✅ Gemini + Murf complete!`
+    }
 
     catch(err) {
         statusDiv.textContent = `❌ Error: ${err.message}`;
