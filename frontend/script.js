@@ -12,6 +12,8 @@ const statusDiv = document.getElementById('status');
 const transcriptContainer = document.getElementById('transHead');
 const Transcript = document.getElementById("transcription");
 
+const chatContainer = document.getElementById("chat-container")
+
 Generate_btn.addEventListener('click', async (e) => {
     e.preventDefault();
     const textIP = document.getElementById('ip_text').value;
@@ -58,6 +60,7 @@ let audioChunks = [];
 
 startBtn.addEventListener('click', async() => {
     try {
+        statusDiv.style.display = "none";
         const stream = await navigator.mediaDevices.getUserMedia({audio:true});
         
         mediaRecorder = new MediaRecorder(stream);
@@ -125,6 +128,9 @@ resetBtn.addEventListener('click', () => {
 
     transcriptContainer.style.display = "none";
     Transcript.textContent = "";
+
+    chatContainer.style.display = "none";
+    chatContainer.innerHTML = "";
 });
 
 async function uploadAudio(blob) {
@@ -222,15 +228,33 @@ async function echoWithMurf(blob) {
     }
 }
 
+let session_id = new URLSearchParams(window.location.search).get("session_id");
+if(!session_id) {
+    session_id = Math.random().toString(36).substring(2,10);
+    window.history.replaceState({}, "", `?session_id = ${session_id}`);
+}
+
+let convoHistory = []
+
+function appendMsg(sender,text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add(sender == "You" ? "user-msg" : "bot-msg");
+    msgDiv.innerHTML = `<strong>${sender} : </strong> ${text}`
+    chatContainer.appendChild(msgDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
 async function askLLMWithMurf(blob) {
     statusDiv.style.display = "block";
     statusDiv.textContent = "Processing with Gemini + Murf";
+
+    chatContainer.style.display = "block";
 
     const formData = new FormData();
     formData.append("file",blob,"recording.wav");
 
     try {
-        const response = await fetch("/llm/query", {
+        const response = await fetch(`/agent/chat/${session_id}`, {
             method : "POST",
             body : formData
         });
@@ -241,14 +265,18 @@ async function askLLMWithMurf(blob) {
 
         const data = await response.json();
 
-        transcriptContainer.style.display = "block";
-        Transcript.textContent = `You: ${data.user_transcript}\n\nLLM: ${data.llm_text}`;
+        appendMsg("You",data.user_transcript);
+        appendMsg("LLM",data.llm_text);
 
         playback.src = data.audio_url;
         playback.load();
         playback.play();
 
-        statusDiv.textContent = `✅ Gemini + Murf complete!`
+        playback.onended = () => {
+            startBtn.click();
+        }
+        
+        statusDiv.style.display = "none";
     }
 
     catch(err) {

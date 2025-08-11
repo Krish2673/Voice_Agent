@@ -59,6 +59,7 @@ body {
     width: 275px;
     border: 3px solid aquamarine;
     border-radius: 30px;
+    margin-bottom: 1rem;
     /* display: none; */
 }
 
@@ -123,4 +124,12 @@ body {
 
 #transcription {
     color: azure;
+}
+
+#chat-container {
+    margin: 1rem;
+    display: none;
+    max-height: 400px;
+    overflow-y: auto;
+    color: aliceblue;
 }
