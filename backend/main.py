@@ -10,9 +10,9 @@ import assemblyai as aai
 from google import genai
 from typing import List,Dict
 
-load_dotenv()
+# load_dotenv()
 
-aai.settings.api_key = os.getenv("AssemblyAI_API_KEY")
+# aai.settings.api_key = os.getenv("AssemblyAI_API_KEY")
 
 uploadDIR = Path("uploads")
 uploadDIR.mkdir(exist_ok = True)
@@ -154,4 +154,15 @@ async def agent_chat(session_id : str, file : UploadFile = File(...)):
         })
 
     except Exception as e:
-        return JSONResponse(content = {"error" : str(e)}, status_code = 500)
+        error_msg = f"An error occured : {str(e)}"
+
+        try:
+            murf_client = Murf(api_key = os.getenv("MURF_API_KEY"))         #Send LLM Response to Murf tts
+            murf_res = murf_client.text_to_speech.generate(
+            text = error_msg,
+            voice_id = "en-US-terrell"
+            )
+            return JSONResponse(content = {"error" : error_msg, "audio_url" : murf_res.audio_file}, status_code = 500)
+        
+        except Exception as murf_error:
+            return JSONResponse(content = {"error" : f"{error_msg} | TTS Failed : {str(murf_error)}"}, status_code = 500)

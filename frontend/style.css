@@ -133,3 +133,19 @@ body {
     overflow-y: auto;
     color: aliceblue;
 }
+
+.user-message {
+    background-color: #e1ffc7;
+    padding: 8px;
+    margin: 4px;
+    border-radius: 5px;
+    align-self: flex-end;
+}
+
+.bot-message {
+    background-color: #f0f0f0;
+    padding: 8px;
+    margin: 4px;
+    border-radius: 5px;
+    align-self: flex-start;
+}

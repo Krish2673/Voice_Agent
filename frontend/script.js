@@ -258,12 +258,19 @@ async function askLLMWithMurf(blob) {
             method : "POST",
             body : formData
         });
+        
+        const data = await response.json();
 
         if(!response.ok) {
-            throw new Error(`LLM Voice Query Failed: ${response.status}`);
-        }
+            statusDiv.textContent = `❌ Error: ${data.error || "Unknown error"}`
 
-        const data = await response.json();
+            if(data.audio_url) {
+                playback.src = data.audio_url;
+                playback.load();
+                playback.play();
+            }
+            return;
+        }
 
         appendMsg("You",data.user_transcript);
         appendMsg("LLM",data.llm_text);
