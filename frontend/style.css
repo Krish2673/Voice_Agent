@@ -5,147 +5,101 @@
 }
 
 body {
-    background: linear-gradient(135deg, #111, #333);
+    font-family: Arial, sans-serif;
     height: 100vh;
+    background: linear-gradient(135deg, #111, #333);
+    color: white;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
+    padding: 20px;
 }
 
-.heading {
-    color: aliceblue;
-}
-
-.tts {
-    display: flex;
-    padding: 1rem;
-    gap: 1.5rem;
-    align-items: center;
-}
-
-#ip_text {
-    border: 3px solid aquamarine;
-    border-radius: 7px ;
-    height: 2.3rem;
-    width: 11rem;
-    padding: 0.4rem;    
-    color: black;
-    font-weight: 600;
-}
-
-.btns{
-    padding: 0.5rem;
-    border: 2px solid aquamarine;
-    border-radius: 9px;
-    background-color: aqua;
-    font-size: 0.9rem;
-}
-
-.btns:hover{
-    cursor: pointer;
-}
-
-#audioPlayer {
-    margin-top: 0.7rem;
-    width: 250px;
-    border: 3px solid aquamarine;
-    border-radius: 30px;
-    display: none;
-}
-
-#echoPlayer {
-    margin-top: 1.2rem;
-    width: 275px;
-    border: 3px solid aquamarine;
-    border-radius: 30px;
-    margin-bottom: 1rem;
-    /* display: none; */
-}
-
-.echoHead {
-    color: aliceblue;
-}
-
-#stop-btn {
-    cursor: not-allowed;
-}
-
-.echoBot {
-    display: flex;
-    gap: 1.5rem;
-    margin: 1rem;
-}
-
-#reset-btn {
-    cursor: not-allowed;
-}
-
-#record-indicator {
-    display: none;
-    color: red;
-    font-weight: bold;
-    margin-top: 1rem;
-}
-
-.section-box {
+.chat-container {
+    width: 750px;
+    max-width: 90%;
+    height: 90%;
+    background-color: #1e1e1e;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    border: 2px solid aquamarine;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin: 1.5rem;
-    background-color: #292828;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
-    width: 420px;
-}
-
-#status{
-    margin-top: 1rem;
-    font-weight: bold;
-    color: green;
-    display: none;
-}
-
-#transcript {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
     align-items: center;
 }
 
-#transHead {
-    color: aliceblue;
-    margin: 1rem;
-    display: none;
-}
-
-#transcription {
-    color: azure;
-}
-
-#chat-container {
-    margin: 1rem;
-    display: none;
-    max-height: 400px;
+#chat-box {
+    height: 550px;
+    width: 95%;
     overflow-y: auto;
-    color: aliceblue;
+    background-color: #2a2a2a;
+    border-radius: 10px;
+    padding: 10px;
+    margin: 20px;
+    display: flex;
+    flex-direction: column;
 }
 
-.user-message {
-    background-color: #e1ffc7;
-    padding: 8px;
-    margin: 4px;
-    border-radius: 5px;
+.message {
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    max-width: 80%;
+    word-wrap: break-word;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.user-msg {
+    background-color: #068321;
+    border: 1px solid black;
+    border-radius: 10px;
     align-self: flex-end;
+    text-align: right;
 }
 
-.bot-message {
-    background-color: #f0f0f0;
-    padding: 8px;
-    margin: 4px;
-    border-radius: 5px;
+.bot-msg {
+    background-color: #3a2bc6;
+    border: 1px solid black;
+    border-radius: 10px;
     align-self: flex-start;
+}
+
+.record-btn {
+    background-color: aqua;
+    border: 3px solid aquamarine;
+    /* padding: 0.55rem; */
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    font-size: 23px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+#record-btn:hover {
+    transform: scale(1.05);
+}
+
+.record-btn.recording {
+    background-color: red;
+    animation: breathing 1.5s ease-in-out infinite;
+}
+
+.record-btn.thinking {
+    font-size: 12px;
+    color: black;
+}
+
+@keyframes breathing {
+    0% { box-shadow: 0 0 5px rgba(255,0,0,0.6); }
+    50% { box-shadow: 0 0 15px rgba(255,0,0,0.9); }
+    100% { box-shadow: 0 0 5px rgba(255,0,0,0.6); }
+}
+
+#audio-player {
+    display: none;
 }
