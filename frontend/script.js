@@ -1,5 +1,4 @@
 const chatBox = document.getElementById('chat-box');
-
 const recordBtn = document.getElementById('record-btn');
 const playback = document.getElementById('audio-player');
 
@@ -13,6 +12,66 @@ if(!session_id) {
     session_id = Math.random().toString(36).substring(2,10);
     window.history.replaceState({}, "", `?session_id=${session_id}`);
 }
+
+let socket;
+function initSocket() {
+    socket = new WebSocket(`ws://${window.location.host}/agent/chat/${session_id}`);
+
+    socket.onopen = () => {
+        console.log("Websocket Connected!");
+    };
+
+    socket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            
+            if(data.type === "error") {
+                appendMsg("LLM",data.error || "Something went Wrong");
+                recordBtn.disabled = false;
+                recordBtn.textContent = "Start";
+                return;
+            }
+
+            if(data.type === "transcript") {
+                appendMsg("You", data.user_transcript || "(No Transcript)");
+            }
+
+            if(data.type === "response") {
+                appendMsg("LLM", data.llm_text || "(No response)");
+            }
+
+            if(data.type === "audio" && data.audio_url) {
+                isPlaying = true;
+                playback.src = data.audio_url;
+                playback.load();
+                playback.play();
+
+                playback.onended = () => {
+                    isPlaying = false;
+                    recordBtn.disabled = false;
+                    recordBtn.classList.remove('thinking');
+                    recordBtn.textContent = "Start";
+                    startRecording();
+                };
+            }
+        }
+
+        catch(err) {
+            console.error("Invalid ws message: ", event.data);
+        }
+    };
+
+    socket.onclose = () => {
+        console.log("Websocket closed, reconnecting...");
+        setTimeout(initSocket,2000);
+    };
+
+    socket.onerror = (err) => {
+        console.error("Websocket error: ", err);
+    };
+}
+
+initSocket();
 
 function appendMsg(sender,text) {
     const msgDiv = document.createElement('div');
@@ -31,23 +90,23 @@ recordBtn.addEventListener('click', () => {
 async function startRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        
-        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder = new MediaRecorder(stream, {mimeType : 'audio/webm'});
         audioChunks = [];
 
         mediaRecorder.ondataavailable = event => {
             if(event.data.size > 0) {
+                socket.send(event.data);
                 audioChunks.push(event.data);
             }
         };
 
         mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
-            
-            askLLMWithMurf(audioBlob);
+            // const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
+            socket.send(JSON.stringify({type : "end_of_audio"}));
+            // askLLMWithMurf(audioBlob);
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(500);
         isRecording = true;
         
         recordBtn.textContent = "Stop";
