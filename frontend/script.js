@@ -6,6 +6,7 @@ let mediaRecorder;
 let audioChunks = [];
 let isRecording = false;
 let isPlaying = false;
+let audioContext, source, processor, stream;
 
 let session_id = new URLSearchParams(window.location.search).get("session_id");
 if(!session_id) {
@@ -89,26 +90,40 @@ recordBtn.addEventListener('click', () => {
 
 async function startRecording() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        mediaRecorder = new MediaRecorder(stream, {mimeType : 'audio/webm'});
-        audioChunks = [];
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new AudioContext({ sampleRate: 16000 }); // force 16kHz
+        source = audioContext.createMediaStreamSource(stream);
 
-        mediaRecorder.ondataavailable = event => {
-            if(event.data.size > 0) {
-                socket.send(event.data);
-                audioChunks.push(event.data);
-            }
+        // create a processor to grab raw audio
+        processor = audioContext.createScriptProcessor(4096, 1, 1);
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = (event) => {
+            const inputData = event.inputBuffer.getChannelData(0); // Float32
+            const pcm16 = floatTo16BitPCM(inputData);
+            const blob = new Blob([pcm16], { type: "application/octet-stream" });
+            socket.send(blob); // send raw PCM16 to backend
         };
+        // const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+        // mediaRecorder = new MediaRecorder(stream, {mimeType : 'audio/webm'});
+        // audioChunks = [];
 
-        mediaRecorder.onstop = () => {
-            // const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
-            socket.send(JSON.stringify({type : "end_of_audio"}));
-            // askLLMWithMurf(audioBlob);
-        };
+        // mediaRecorder.ondataavailable = event => {
+        //     if(event.data.size > 0) {
+        //         socket.send(event.data);
+        //         audioChunks.push(event.data);
+        //     }
+        // };
 
-        mediaRecorder.start(500);
+        // mediaRecorder.onstop = () => {
+        //     // const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
+        //     socket.send(JSON.stringify({type : "end_of_audio"}));
+        //     // askLLMWithMurf(audioBlob);
+        // };
+
+        // mediaRecorder.start(500);
         isRecording = true;
-        
         recordBtn.textContent = "Stop";
         recordBtn.classList.add('recording');        
     }
@@ -119,12 +134,30 @@ async function startRecording() {
 }
 
 function stopRecording() {
-    if(mediaRecorder && isRecording) {
-        mediaRecorder.stop();
-        isRecording = false;
-        recordBtn.textContent = "Start";
-        recordBtn.classList.remove('recording');
+    // if(mediaRecorder && isRecording) {
+    //     mediaRecorder.stop();
+    //     isRecording = false;
+    //     recordBtn.textContent = "Start";
+    //     recordBtn.classList.remove('recording');
+    // }
+    if (!isRecording) return;
+
+    if (processor) {
+        processor.disconnect();
+        processor.onaudioprocess = null;
     }
+    if (source) source.disconnect();
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContext) audioContext.close();
+
+    // tell backend recording is finished
+    socket.send(JSON.stringify({ type: "end_of_audio" }));
+
+    isRecording = false;
+    recordBtn.textContent = "Start";
+    recordBtn.classList.remove('recording');
 }
 
 let convoHistory = []
@@ -190,4 +223,15 @@ async function askLLMWithMurf(blob) {
     finally {
         recordBtn.classList.remove('thinking');
     }
+}
+
+function floatTo16BitPCM(float32Array) {
+    const buffer = new ArrayBuffer(float32Array.length * 2);
+    const view = new DataView(buffer);
+    let offset = 0;
+    for (let i = 0; i < float32Array.length; i++, offset += 2) {
+        let s = Math.max(-1, Math.min(1, float32Array[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buffer;
 }
