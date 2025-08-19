@@ -20,15 +20,6 @@ aai.settings.api_key = os.getenv("AssemblyAI_API_KEY")
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# def convert_to_pcm16(audio_bytes: bytes) -> bytes:
-#     process = subprocess.Popen(
-#         ["ffmpeg", "-i", "pipe:0", "-f", "s16le", "-acodec", "pcm_s16le",
-#          "-ac", "1", "-ar", "16000", "pipe:1"],
-#         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-#     )
-#     pcm_data, _ = process.communicate(input=audio_bytes)
-#     return pcm_data
-
 @router.websocket("/agent/chat/{session_id}")
 async def websocket_chat(websocket : WebSocket, session_id : str):
     await websocket.accept()
@@ -38,8 +29,32 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
     StreamingClientOptions(api_key=aai.settings.api_key)
     )
 
+    mainLoop = asyncio.get_event_loop()
+
     def on_turn(client, event):
         logger.info(f"[Transcript] {event.transcript} (end_of_turn={event.end_of_turn})")
+
+        if event.end_of_turn:
+            asyncio.run_coroutine_threadsafe(
+                websocket.send_text(
+                    f'{{"type" : "final_transcript", "text" : "{event.transcript}"}}'
+                ),
+                mainLoop
+            )
+            asyncio.run_coroutine_threadsafe(
+                websocket.send_text(
+                    '{"type" : "turn_end"}'
+                ),
+                mainLoop
+            )
+
+        else:
+            asyncio.run_coroutine_threadsafe(
+                websocket.send_text(
+                    f'{{"type" : "partial_transcript", "text" : "{event.transcript}"}}'
+                ),
+                mainLoop
+            )
 
     client.on(StreamingEvents.Turn, on_turn)
     client.on(StreamingEvents.Error, lambda c,e: logger.error(f"Error: {e}"))

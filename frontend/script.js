@@ -14,7 +14,9 @@ if(!session_id) {
     window.history.replaceState({}, "", `?session_id=${session_id}`);
 }
 
+let partialDiv = null;
 let socket;
+
 function initSocket() {
     socket = new WebSocket(`ws://${window.location.host}/agent/chat/${session_id}`);
 
@@ -33,8 +35,33 @@ function initSocket() {
                 return;
             }
 
-            if(data.type === "transcript") {
-                appendMsg("You", data.user_transcript || "(No Transcript)");
+            if(data.type === "partial_transcript") {
+                if(!partialDiv) {
+                    partialDiv = document.createElement('div');
+                    partialDiv.className = "message user-msg partial";
+                    partialDiv.innerHTML = `<strong>You : </strong> ${data.text || "(Listening...)"}`;
+                    chatBox.appendChild(partialDiv);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+                else {
+                    partialDiv.innerHTML = `<strong>You : </strong> ${data.text}`;
+                }
+            }
+
+            if(data.type === "final_transcript") {
+                if(partialDiv) {
+                    partialDiv.innerHTML = `<strong>You : </strong> ${data.text}`;
+                    partialDiv.classList.remove("partial");
+                    partialDiv = null;
+                }
+                else {
+                    appendMsg("You", data.text || "(No Transcript)");
+                }
+            }
+
+            if(data.type === "turn_end") {
+                console.log("User turn ended.");
+                stopRecording();
             }
 
             if(data.type === "response") {
@@ -80,6 +107,7 @@ function appendMsg(sender,text) {
     msgDiv.innerHTML = `<strong>${sender} : </strong> ${text}`
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
+    // return msgDiv;
 }
 
 recordBtn.addEventListener('click', () => {
@@ -105,22 +133,6 @@ async function startRecording() {
             const blob = new Blob([pcm16], { type: "application/octet-stream" });
             socket.send(blob); // send raw PCM16 to backend
         };
-        // const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        // mediaRecorder = new MediaRecorder(stream, {mimeType : 'audio/webm'});
-        // audioChunks = [];
-
-        // mediaRecorder.ondataavailable = event => {
-        //     if(event.data.size > 0) {
-        //         socket.send(event.data);
-        //         audioChunks.push(event.data);
-        //     }
-        // };
-
-        // mediaRecorder.onstop = () => {
-        //     // const audioBlob = new Blob(audioChunks, {type:"audio/webm"});
-        //     socket.send(JSON.stringify({type : "end_of_audio"}));
-        //     // askLLMWithMurf(audioBlob);
-        // };
 
         // mediaRecorder.start(500);
         isRecording = true;
@@ -134,12 +146,6 @@ async function startRecording() {
 }
 
 function stopRecording() {
-    // if(mediaRecorder && isRecording) {
-    //     mediaRecorder.stop();
-    //     isRecording = false;
-    //     recordBtn.textContent = "Start";
-    //     recordBtn.classList.remove('recording');
-    // }
     if (!isRecording) return;
 
     if (processor) {
