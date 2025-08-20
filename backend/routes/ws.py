@@ -11,11 +11,12 @@ from assemblyai.streaming.v3 import (
     TerminationEvent,
     TurnEvent,
 )
-from dotenv import load_dotenv
-import logging, os, asyncio, subprocess
+import logging, asyncio, subprocess
+from google import genai
+from backend.utils.config import GEMINI_API_KEY
+from backend.utils.config import ASSEMBLYAI_API_KEY
 
-load_dotenv()
-aai.settings.api_key = os.getenv("AssemblyAI_API_KEY")
+aai.settings.api_key = ASSEMBLYAI_API_KEY
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -30,23 +31,29 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
     )
 
     mainLoop = asyncio.get_event_loop()
-
+    last_transcript = None
     def on_turn(client, event):
         logger.info(f"[Transcript] {event.transcript} (end_of_turn={event.end_of_turn})")
 
         if event.end_of_turn:
-            asyncio.run_coroutine_threadsafe(
-                websocket.send_text(
-                    f'{{"type" : "final_transcript", "text" : "{event.transcript}"}}'
-                ),
-                mainLoop
-            )
-            asyncio.run_coroutine_threadsafe(
-                websocket.send_text(
-                    '{"type" : "turn_end"}'
-                ),
-                mainLoop
-            )
+            nonlocal last_transcript
+            if last_transcript is None:
+                last_transcript = event.transcript
+            else:
+                asyncio.run_coroutine_threadsafe(
+                    websocket.send_text(
+                        f'{{"type" : "final_transcript", "text" : "{event.transcript}"}}'
+                    ),
+                    mainLoop
+                )
+                asyncio.run_coroutine_threadsafe(
+                    websocket.send_text(
+                        '{"type" : "turn_end"}'
+                    ),
+                    mainLoop
+                )
+                mainLoop.run_in_executor(None, stream_llm_response, event.transcript,websocket,mainLoop)
+                last_transcript = None
 
         else:
             asyncio.run_coroutine_threadsafe(
@@ -78,3 +85,31 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
 
     except WebSocketDisconnect:
         logger.info(f"Client {session_id} disconnected")
+
+def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
+    client = genai.Client(api_key = GEMINI_API_KEY)
+    response = client.models.generate_content_stream(
+        model = "gemini-2.0-flash",
+        contents = prompt
+    )
+    
+    def send_chunks():
+        final_text = ""
+        print("\n[LLM Response]")
+        for chunk in response:
+            if chunk.text:
+                final_text += chunk.text
+                asyncio.run_coroutine_threadsafe(
+                    websocket.send_text(
+                        f'{{"type": "llm_chunk", "text": "{chunk.text}"}}'
+                    ),
+                    mainLoop
+                )
+                print(chunk.text, end="", flush=True)
+        asyncio.run_coroutine_threadsafe(
+            websocket.send_text('{"type": "llm_end"}'),
+            mainLoop
+        )
+        print("\n" + "-" * 80)
+
+    mainLoop.run_in_executor(None, send_chunks)
