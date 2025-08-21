@@ -11,15 +11,17 @@ from assemblyai.streaming.v3 import (
     TerminationEvent,
     TurnEvent,
 )
-import logging, asyncio, subprocess
+import logging, asyncio, subprocess, websockets, json
 from google import genai
-from backend.utils.config import GEMINI_API_KEY
-from backend.utils.config import ASSEMBLYAI_API_KEY
+from backend.utils.config import GEMINI_API_KEY, ASSEMBLYAI_API_KEY, MURF_API_KEY
 
 aai.settings.api_key = ASSEMBLYAI_API_KEY
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+MURF_WS_URL = f"wss://api.murf.ai/v1/speech/stream-input?api_key={MURF_API_KEY}" 
+STATIC_CONTEXT_ID = "day20-demo-context"
 
 @router.websocket("/agent/chat/{session_id}")
 async def websocket_chat(websocket : WebSocket, session_id : str):
@@ -32,6 +34,7 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
 
     mainLoop = asyncio.get_event_loop()
     last_transcript = None
+
     def on_turn(client, event):
         logger.info(f"[Transcript] {event.transcript} (end_of_turn={event.end_of_turn})")
 
@@ -73,7 +76,6 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
             data = await websocket.receive()
 
             if "bytes" in data:
-                # pcm_chunk = convert_to_pcm16(data["bytes"]) 
                 await asyncio.to_thread(client.stream, data["bytes"])
             
             elif "text" in data:
@@ -93,6 +95,24 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
         contents = prompt
     )
     
+    async def send_to_murf(text : str):
+        async with websockets.connect(MURF_WS_URL) as ws:
+            await ws.send(json.dumps({
+                "context_id": STATIC_CONTEXT_ID,
+                "voiceId": "en-US-terrel",  # example voice
+                "format": "mp3",
+                "text": text
+            }))
+
+            async for msg in ws:
+                data = json.loads(msg)
+                if "audio" in data:
+                    base64_audio = data["audio"]
+                    print("\n[Murf Base64 Audio]")
+                    print(base64_audio[:100] + "...")
+                    print("-"*80)
+                    break
+
     def send_chunks():
         final_text = ""
         print("\n[LLM Response]")
@@ -111,5 +131,7 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
             mainLoop
         )
         print("\n" + "-" * 80)
+
+        asyncio.run(send_to_murf(final_text))
 
     mainLoop.run_in_executor(None, send_chunks)
