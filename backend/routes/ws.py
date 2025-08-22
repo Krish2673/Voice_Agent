@@ -68,7 +68,6 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
 
     client.on(StreamingEvents.Turn, on_turn)
     client.on(StreamingEvents.Error, lambda c,e: logger.error(f"Error: {e}"))
-
     client.connect(StreamingParameters(sample_rate=16000, format_turns=True))
 
     try:
@@ -77,11 +76,16 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
 
             if "bytes" in data:
                 await asyncio.to_thread(client.stream, data["bytes"])
+                await websocket.send_text(json.dumps({
+                    "type": "audio_chunk",
+                    "data": data["bytes"].hex()  # or base64 if you prefer
+                }))
             
             elif "text" in data:
                 msg = data["text"]
                 logger.info(f"Text msg from {session_id}: {msg}")
                 if msg == "end_of_audio":
+                    await websocket.send_text(json.dumps({"type": "end_of_audio"}))
                     await asyncio.to_thread(client.disconnect)
                     break
 
@@ -95,7 +99,7 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
         contents = prompt
     )
     
-    async def send_to_murf(text : str):
+    async def send_to_murf(text : str, websocket : WebSocket, mainLoop):
         async with websockets.connect(MURF_WS_URL) as ws:
             await ws.send(json.dumps({
                 "context_id": STATIC_CONTEXT_ID,
@@ -106,11 +110,22 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
 
             async for msg in ws:
                 data = json.loads(msg)
+
                 if "audio" in data:
-                    base64_audio = data["audio"]
-                    print("\n[Murf Base64 Audio]")
-                    print(base64_audio[:100] + "...")
-                    print("-"*80)
+                    base64_chunk = data["audio"]
+                    asyncio.run_coroutine_threadsafe(
+                    websocket.send_text(
+                        json.dumps({"type": "audio_chunk", "data": base64_chunk})
+                    ),
+                    mainLoop
+                )
+
+                if data.get("event") == "completed":
+                    asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps({"type": "end_of_audio"})),
+                        mainLoop
+                    )
+                    print("[Server] Murf audio stream completed")
                     break
 
     def send_chunks():
@@ -132,6 +147,6 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
         )
         print("\n" + "-" * 80)
 
-        asyncio.run(send_to_murf(final_text))
+        asyncio.run(send_to_murf(final_text,websocket,mainLoop))
 
     mainLoop.run_in_executor(None, send_chunks)

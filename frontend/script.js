@@ -16,6 +16,7 @@ if(!session_id) {
 
 let partialDiv = null;
 let socket;
+let i = 1;
 
 function initSocket() {
     socket = new WebSocket(`ws://${window.location.host}/agent/chat/${session_id}`);
@@ -33,6 +34,27 @@ function initSocket() {
                 recordBtn.disabled = false;
                 recordBtn.textContent = "Start";
                 return;
+            }
+
+            if (data.type === "audio_chunk") {
+                audioChunks.push(data.data);
+                console.log(`[Client] Received audio chunk ${i}`);
+                i++;
+            }
+
+            if (data.type === "end_of_audio") {
+                console.log("[Client] Audio stream completed");
+                console.log("[Client] Total chunks received:", audioChunks.length);
+            }
+
+            if (data.type === "llm_chunk") {
+                // console.log("[Client] LLM chunk:", data.text);
+                // optionally show streaming text in UI
+                // appendMsg("LLM", data.text);
+            }
+
+            if (data.type === "llm_end") {
+                console.log("[Client] LLM response completed.");
             }
 
             if(data.type === "partial_transcript") {
@@ -85,7 +107,7 @@ function initSocket() {
         }
 
         catch(err) {
-            console.error("Invalid ws message: ", event.data);
+            // console.error("Invalid ws message: ", event.data);
         }
     };
 
@@ -128,10 +150,11 @@ async function startRecording() {
         processor.connect(audioContext.destination);
 
         processor.onaudioprocess = (event) => {
-            const inputData = event.inputBuffer.getChannelData(0); // Float32
+            const inputData = event.inputBuffer.getChannelData(0); 
             const pcm16 = floatTo16BitPCM(inputData);
             const blob = new Blob([pcm16], { type: "application/octet-stream" });
-            socket.send(blob); // send raw PCM16 to backend
+            socket.send(blob);
+            console.log("[Client] Sent audio chunk");
         };
 
         // mediaRecorder.start(500);
