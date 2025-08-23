@@ -11,7 +11,7 @@ from assemblyai.streaming.v3 import (
     TerminationEvent,
     TurnEvent,
 )
-import logging, asyncio, subprocess, websockets, json
+import logging, asyncio, subprocess, websockets, json, base64
 from google import genai
 from backend.utils.config import GEMINI_API_KEY, ASSEMBLYAI_API_KEY, MURF_API_KEY
 
@@ -78,7 +78,7 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
                 await asyncio.to_thread(client.stream, data["bytes"])
                 await websocket.send_text(json.dumps({
                     "type": "audio_chunk",
-                    "data": data["bytes"].hex()  # or base64 if you prefer
+                    "data": base64.b64encode(data["bytes"]).decode("utf-8")  # always base64
                 }))
             
             elif "text" in data:
@@ -104,7 +104,7 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
             await ws.send(json.dumps({
                 "context_id": STATIC_CONTEXT_ID,
                 "voiceId": "en-US-terrel",  # example voice
-                "format": "mp3",
+                "format": "wav",
                 "text": text
             }))
 

@@ -16,7 +16,10 @@ if(!session_id) {
 
 let partialDiv = null;
 let socket;
-let i = 1;
+let audioQueue = [];
+let isPlayingStream = false;
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let firstChunk = true;
 
 function initSocket() {
     socket = new WebSocket(`ws://${window.location.host}/agent/chat/${session_id}`);
@@ -27,87 +30,106 @@ function initSocket() {
 
     socket.onmessage = (event) => {
         try {
-            const data = JSON.parse(event.data);
+            let data;
+            try {
+                data = JSON.parse(event.data);
+            } catch {
+                data = null;
+            }
             
-            if(data.type === "error") {
+            if(data?.type === "error") {
                 appendMsg("LLM",data.error || "Something went Wrong");
                 recordBtn.disabled = false;
                 recordBtn.textContent = "Start";
                 return;
             }
 
-            if (data.type === "audio_chunk") {
-                audioChunks.push(data.data);
-                console.log(`[Client] Received audio chunk ${i}`);
-                i++;
-            }
-
-            if (data.type === "end_of_audio") {
-                console.log("[Client] Audio stream completed");
-                console.log("[Client] Total chunks received:", audioChunks.length);
-            }
-
-            if (data.type === "llm_chunk") {
-                // console.log("[Client] LLM chunk:", data.text);
-                // optionally show streaming text in UI
-                // appendMsg("LLM", data.text);
-            }
-
-            if (data.type === "llm_end") {
-                console.log("[Client] LLM response completed.");
-            }
-
-            if(data.type === "partial_transcript") {
-                if(!partialDiv) {
-                    partialDiv = document.createElement('div');
-                    partialDiv.className = "message user-msg partial";
-                    partialDiv.innerHTML = `<strong>You : </strong> ${data.text || "(Listening...)"}`;
-                    chatBox.appendChild(partialDiv);
-                    chatBox.scrollTop = chatBox.scrollHeight;
+            if(data && data.type) {
+                if (data.type === "audio_chunk") {
+                    const wavData = base64ToArrayBuffer(data.data);
+                    const pcmData = firstChunk ? wavData.slice(44) : wavData;
+                    firstChunk = false;
+                    audioQueue.push(pcmData);
+                    if (!isPlayingStream) {
+                        playNextChunk();
+                    }
                 }
-                else {
-                    partialDiv.innerHTML = `<strong>You : </strong> ${data.text}`;
+                else if (data.type === "end_of_audio") {
+                    console.log("[Client] Audio stream completed");
+                    firstChunk = true;
+                }
+
+                else if (data.type === "llm_chunk") {
+                    // console.log("[Client] LLM chunk:", data.text);
+                    // optionally show streaming text in UI
+                    // appendMsg("LLM", data.text);
+                }
+
+                else if (data.type === "llm_end") {
+                    console.log("[Client] LLM response completed.");
+                }
+
+                else if(data.type === "partial_transcript") {
+                    if(!partialDiv) {
+                        partialDiv = document.createElement('div');
+                        partialDiv.className = "message user-msg partial";
+                        partialDiv.innerHTML = `<strong>You : </strong> ${data.text || "(Listening...)"}`;
+                        chatBox.appendChild(partialDiv);
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                    else {
+                        partialDiv.innerHTML = `<strong>You : </strong> ${data.text}`;
+                    }
+                }
+
+                else if(data.type === "final_transcript") {
+                    if(partialDiv) {
+                        partialDiv.innerHTML = `<strong>You : </strong> ${data.text}`;
+                        partialDiv.classList.remove("partial");
+                        partialDiv = null;
+                    }
+                    else {
+                        appendMsg("You", data.text || "(No Transcript)");
+                    }
+                }
+
+                else if(data.type === "turn_end") {
+                    console.log("User turn ended.");
+                    stopRecording();
+                }
+
+                else if(data.type === "response") {
+                    appendMsg("LLM", data.llm_text || "(No response)");
+                }
+
+                else if(data.type === "audio" && data.audio_url) {
+                    isPlaying = true;
+                    playback.src = data.audio_url;
+                    playback.load();
+                    playback.play();
+
+                    playback.onended = () => {
+                        isPlaying = false;
+                        recordBtn.disabled = false;
+                        recordBtn.classList.remove('thinking');
+                        recordBtn.textContent = "Start";
+                        startRecording();
+                    };
                 }
             }
-
-            if(data.type === "final_transcript") {
-                if(partialDiv) {
-                    partialDiv.innerHTML = `<strong>You : </strong> ${data.text}`;
-                    partialDiv.classList.remove("partial");
-                    partialDiv = null;
+            else if (typeof event.data === "string") {
+                const wavData = base64ToArrayBuffer(event.data);
+                const pcmData = firstChunk ? wavData.slice(44) : wavData;
+                firstChunk = false;
+                audioQueue.push(pcmData);
+                if (!isPlayingStream) {
+                    playNextChunk();
                 }
-                else {
-                    appendMsg("You", data.text || "(No Transcript)");
-                }
-            }
-
-            if(data.type === "turn_end") {
-                console.log("User turn ended.");
-                stopRecording();
-            }
-
-            if(data.type === "response") {
-                appendMsg("LLM", data.llm_text || "(No response)");
-            }
-
-            if(data.type === "audio" && data.audio_url) {
-                isPlaying = true;
-                playback.src = data.audio_url;
-                playback.load();
-                playback.play();
-
-                playback.onended = () => {
-                    isPlaying = false;
-                    recordBtn.disabled = false;
-                    recordBtn.classList.remove('thinking');
-                    recordBtn.textContent = "Start";
-                    startRecording();
-                };
             }
         }
 
         catch(err) {
-            // console.error("Invalid ws message: ", event.data);
+            console.error("Invalid ws message: ", event.data);
         }
     };
 
@@ -121,7 +143,9 @@ function initSocket() {
     };
 }
 
-initSocket();
+window.onload = () => {
+    initSocket();
+};
 
 function appendMsg(sender,text) {
     const msgDiv = document.createElement('div');
@@ -141,13 +165,16 @@ recordBtn.addEventListener('click', () => {
 async function startRecording() {
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new AudioContext({ sampleRate: 16000 }); // force 16kHz
+        audioContext = new AudioContext({ sampleRate: 16000 });
         source = audioContext.createMediaStreamSource(stream);
 
-        // create a processor to grab raw audio
         processor = audioContext.createScriptProcessor(4096, 1, 1);
+        const silentNode = audioContext.createGain();
+        silentNode.gain.value = 0;
+
         source.connect(processor);
-        processor.connect(audioContext.destination);
+        processor.connect(silentNode);
+        silentNode.connect(audioContext.destination);
 
         processor.onaudioprocess = (event) => {
             const inputData = event.inputBuffer.getChannelData(0); 
@@ -263,4 +290,51 @@ function floatTo16BitPCM(float32Array) {
         view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     }
     return buffer;
+}
+
+function playNextChunk() {
+    if (audioQueue.length === 0) {
+        isPlayingStream = false;
+        return;
+    }
+
+    isPlayingStream = true;
+    const chunk = audioQueue.shift();
+
+    // convert PCM16 → Float32
+    const float32 = pcm16ToFloat32(new DataView(chunk));
+
+    // create AudioBuffer
+    const audioBuffer = audioCtx.createBuffer(1, float32.length, 42000);
+    audioBuffer.getChannelData(0).set(float32);
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+
+    source.onended = () => {
+        playNextChunk(); // chain next chunk
+    };
+
+    source.start(0);
+}
+
+function base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+function pcm16ToFloat32(dataView) {
+    const len = dataView.byteLength / 2;
+    const result = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+        const s = dataView.getInt16(i * 2, true);
+        result[i] = s / 0x8000;
+    }
+    return result;
 }
