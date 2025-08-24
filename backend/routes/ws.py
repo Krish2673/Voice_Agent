@@ -21,12 +21,17 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 MURF_WS_URL = f"wss://api.murf.ai/v1/speech/stream-input?api_key={MURF_API_KEY}" 
-STATIC_CONTEXT_ID = "day20-demo-context"
+STATIC_CONTEXT_ID = "day23-convo-agent"
+
+chat_history_store = {}
 
 @router.websocket("/agent/chat/{session_id}")
 async def websocket_chat(websocket : WebSocket, session_id : str):
     await websocket.accept()
     logger.info(f"Client connected with session: {session_id}")
+
+    if session_id not in chat_history_store:
+        chat_history_store[session_id] = []
 
     client = StreamingClient(
     StreamingClientOptions(api_key=aai.settings.api_key)
@@ -55,7 +60,10 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
                     ),
                     mainLoop
                 )
-                mainLoop.run_in_executor(None, stream_llm_response, event.transcript,websocket,mainLoop)
+
+                chat_history_store[session_id].append({"role":"user", "content" : event.transcript})
+
+                mainLoop.run_in_executor(None, stream_llm_response, session_id, event.transcript,websocket,mainLoop)
                 last_transcript = None
 
         else:
@@ -68,7 +76,17 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
 
     client.on(StreamingEvents.Turn, on_turn)
     client.on(StreamingEvents.Error, lambda c,e: logger.error(f"Error: {e}"))
-    client.connect(StreamingParameters(sample_rate=16000, format_turns=True))
+    client.connect(StreamingParameters(
+        sample_rate=16000, 
+        format_turns=True, 
+        enable_diarization=False,
+        word_boost=[],
+        filter_profanity=True,
+        punctuate=True,
+        redaction=False,
+        speech_model="default",
+        audio_detection_sensitivity="high"
+    ))
 
     try:
         while True:
@@ -92,8 +110,12 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
     except WebSocketDisconnect:
         logger.info(f"Client {session_id} disconnected")
 
-def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
+def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, mainLoop):
     client = genai.Client(api_key = GEMINI_API_KEY)
+
+    conversation = chat_history_store.get(session_id, [])
+    conversation.append({"role" : "user", "content" : prompt})
+
     response = client.models.generate_content_stream(
         model = "gemini-2.0-flash",
         contents = prompt
@@ -141,6 +163,9 @@ def stream_llm_response(prompt : str, websocket : WebSocket, mainLoop):
                     mainLoop
                 )
                 print(chunk.text, end="", flush=True)
+
+        chat_history_store[session_id].append({"role" : "llm", "content" : final_text})
+
         asyncio.run_coroutine_threadsafe(
             websocket.send_text('{"type": "llm_end"}'),
             mainLoop

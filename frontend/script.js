@@ -15,6 +15,8 @@ if(!session_id) {
 }
 
 let partialDiv = null;
+let llmDiv = null;
+let llmBuffer = "";
 let socket;
 let audioQueue = [];
 let isPlayingStream = false;
@@ -36,15 +38,15 @@ function initSocket() {
             } catch {
                 data = null;
             }
-            
-            if(data?.type === "error") {
+
+            if(data && data.type) {
+                if(data.type === "error") {
                 appendMsg("LLM",data.error || "Something went Wrong");
                 recordBtn.disabled = false;
                 recordBtn.textContent = "Start";
                 return;
-            }
+                }
 
-            if(data && data.type) {
                 if (data.type === "audio_chunk") {
                     const wavData = base64ToArrayBuffer(data.data);
                     const pcmData = firstChunk ? wavData.slice(44) : wavData;
@@ -57,16 +59,25 @@ function initSocket() {
                 else if (data.type === "end_of_audio") {
                     console.log("[Client] Audio stream completed");
                     firstChunk = true;
+                    startRecording();
                 }
 
                 else if (data.type === "llm_chunk") {
-                    // console.log("[Client] LLM chunk:", data.text);
-                    // optionally show streaming text in UI
-                    // appendMsg("LLM", data.text);
+                    llmBuffer += data.text;
                 }
 
                 else if (data.type === "llm_end") {
+                    if(!llmDiv) {
+                        llmDiv = document.createElement('div');
+                        llmDiv.className = "message bot-msg";
+                        chatBox.appendChild(llmDiv);
+                    }
+                    llmDiv.innerHTML = `<strong>LLM : </strong> ${llmBuffer}`;
+                    chatBox.scrollTop = chatBox.scrollHeight;
+
                     console.log("[Client] LLM response completed.");
+                    llmDiv = null;
+                    llmBuffer = "";
                 }
 
                 else if(data.type === "partial_transcript") {
@@ -97,34 +108,6 @@ function initSocket() {
                     console.log("User turn ended.");
                     stopRecording();
                 }
-
-                else if(data.type === "response") {
-                    appendMsg("LLM", data.llm_text || "(No response)");
-                }
-
-                else if(data.type === "audio" && data.audio_url) {
-                    isPlaying = true;
-                    playback.src = data.audio_url;
-                    playback.load();
-                    playback.play();
-
-                    playback.onended = () => {
-                        isPlaying = false;
-                        recordBtn.disabled = false;
-                        recordBtn.classList.remove('thinking');
-                        recordBtn.textContent = "Start";
-                        startRecording();
-                    };
-                }
-            }
-            else if (typeof event.data === "string") {
-                const wavData = base64ToArrayBuffer(event.data);
-                const pcmData = firstChunk ? wavData.slice(44) : wavData;
-                firstChunk = false;
-                audioQueue.push(pcmData);
-                if (!isPlayingStream) {
-                    playNextChunk();
-                }
             }
         }
 
@@ -153,7 +136,6 @@ function appendMsg(sender,text) {
     msgDiv.innerHTML = `<strong>${sender} : </strong> ${text}`
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
-    // return msgDiv;
 }
 
 recordBtn.addEventListener('click', () => {
@@ -164,7 +146,14 @@ recordBtn.addEventListener('click', () => {
 
 async function startRecording() {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: {
+                channelCount : 1,
+                sampleRate : 16000,
+                noiseSuppression :true,
+                echoCancellation : true,
+                autoGainControl : true
+            } 
+        });
         audioContext = new AudioContext({ sampleRate: 16000 });
         source = audioContext.createMediaStreamSource(stream);
 
@@ -184,7 +173,6 @@ async function startRecording() {
             console.log("[Client] Sent audio chunk");
         };
 
-        // mediaRecorder.start(500);
         isRecording = true;
         recordBtn.textContent = "Stop";
         recordBtn.classList.add('recording');        
@@ -216,71 +204,6 @@ function stopRecording() {
     recordBtn.classList.remove('recording');
 }
 
-let convoHistory = []
-
-async function askLLMWithMurf(blob) {
-    recordBtn.disabled = true;
-    recordBtn.textContent = "Thinking...";
-    recordBtn.classList.add('thinking');
-
-    try {
-        const formData = new FormData();
-        formData.append("file",blob,"recording.wav");
-
-        const response = await fetch(`/agent/chat/${session_id}`, {
-            method : "POST",
-            body : formData
-        });
-        
-        if(response.status === 204) {
-            appendMsg("LLM","...No speech detected.")
-            return;
-        }
-
-        const data = await response.json();
-
-        if(!response.ok) {
-            appendMsg("LLM",data.error || "Something Went Wrong");
-            return;
-        }
-
-        if(data.audio_url) {
-                isPlaying = true;
-                playback.src = data.audio_url;
-                playback.load();
-                playback.play();
-                recordBtn.classList.remove('thinking');
-                recordBtn.textContent = "Start";
-        }
-        else {
-            recordBtn.disabled = false;
-            recordBtn.textContent = "Start";
-        }
-
-        appendMsg("You",data.user_transcript || "(No Transcript)");
-        appendMsg("LLM",data.llm_text || "(No response)");
-
-        playback.onended = () => {
-            isPlaying = false;
-            recordBtn.disabled = false;
-            recordBtn.classList.remove('thinking');
-            recordBtn.textContent = "Start";
-            startRecording();
-        }
-    }
-
-    catch(err) {
-        console.error(err);
-        appendMsg("LLM",`❌ Error: ${err.message}`)
-        recordBtn.disabled = false;
-        recordBtn.textContent = "Start"
-    }
-
-    finally {
-        recordBtn.classList.remove('thinking');
-    }
-}
-
 function floatTo16BitPCM(float32Array) {
     const buffer = new ArrayBuffer(float32Array.length * 2);
     const view = new DataView(buffer);
@@ -305,7 +228,7 @@ function playNextChunk() {
     const float32 = pcm16ToFloat32(new DataView(chunk));
 
     // create AudioBuffer
-    const audioBuffer = audioCtx.createBuffer(1, float32.length, 42000);
+    const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
     audioBuffer.getChannelData(0).set(float32);
 
     const source = audioCtx.createBufferSource();
