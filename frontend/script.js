@@ -41,7 +41,7 @@ function initSocket() {
 
             if(data && data.type) {
                 if(data.type === "error") {
-                appendMsg("LLM",data.error || "Something went Wrong");
+                appendMsg("Glitzo",data.error || "Something went Wrong");
                 recordBtn.disabled = false;
                 recordBtn.textContent = "Start";
                 return;
@@ -63,18 +63,18 @@ function initSocket() {
                 }
 
                 else if (data.type === "llm_chunk") {
-                    llmBuffer += data.text;
-                }
-
-                else if (data.type === "llm_end") {
                     if(!llmDiv) {
                         llmDiv = document.createElement('div');
                         llmDiv.className = "message bot-msg";
+                        llmDiv.innerHTML = "<strong>Glitzo : </strong>";
                         chatBox.appendChild(llmDiv);
                     }
-                    llmDiv.innerHTML = `<strong>LLM : </strong> ${llmBuffer}`;
+                    llmBuffer += data.text;
+                    llmDiv.innerHTML = "<strong>Glitzo : </strong>" + llmBuffer;
                     chatBox.scrollTop = chatBox.scrollHeight;
+                }
 
+                else if (data.type === "llm_end") {
                     console.log("[Client] LLM response completed.");
                     llmDiv = null;
                     llmBuffer = "";

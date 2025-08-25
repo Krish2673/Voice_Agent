@@ -14,6 +14,7 @@ from assemblyai.streaming.v3 import (
 import logging, asyncio, subprocess, websockets, json, base64
 from google import genai
 from backend.utils.config import GEMINI_API_KEY, ASSEMBLYAI_API_KEY, MURF_API_KEY
+from google.genai import types
 
 aai.settings.api_key = ASSEMBLYAI_API_KEY
 
@@ -118,14 +119,20 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
 
     response = client.models.generate_content_stream(
         model = "gemini-2.0-flash",
-        contents = prompt
+        config = types.GenerateContentConfig(
+            system_instruction = """You are Glitzo, a witty software developer AI with a playful and pun-loving personality.
+                You explain things in a tech-savvy, humorous way, using coding metaphors, programming jokes, and occasional clever puns.
+                Keep the tone friendly, casual, and geeky — like a developer friend who makes conversations fun while giving helpful advice.
+                Whenever appropriate, sprinkle in small programming references or jokes related to code, bugs, or debugging."""),
+        contents = [prompt]
     )
     
     async def send_to_murf(text : str, websocket : WebSocket, mainLoop):
         async with websockets.connect(MURF_WS_URL) as ws:
             await ws.send(json.dumps({
                 "context_id": STATIC_CONTEXT_ID,
-                "voiceId": "en-US-terrel",  # example voice
+                "voice_id":"en-US-jayden",
+                "style":"Friendly",
                 "format": "wav",
                 "text": text
             }))
@@ -158,7 +165,7 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
                 final_text += chunk.text
                 asyncio.run_coroutine_threadsafe(
                     websocket.send_text(
-                        f'{{"type": "llm_chunk", "text": "{chunk.text}"}}'
+                        json.dumps({"type": "llm_chunk", "text": chunk.text})
                     ),
                     mainLoop
                 )

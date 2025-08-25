@@ -28,6 +28,36 @@ body {
     align-items: center;
 }
 
+.bot-info {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+#bot-name {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 36px;
+    color: #00ffe0;
+    text-shadow: 2px 2px 5px rgba(0,255,224,0.5);
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+#bot-desc {
+    font-family: 'Consolas', monospace;
+    font-size: 16px;
+    color: #a0a0ff;
+    text-shadow: 1px 1px 3px rgba(160,160,255,0.4);
+    font-style: italic;
+}
+
+@keyframes glow {
+    0% { text-shadow: 0 0 5px rgba(0,255,224,0.6), 0 0 10px rgba(0,255,224,0.4); }
+    50% { text-shadow: 0 0 15px rgba(0,255,224,0.9), 0 0 20px rgba(0,255,224,0.6); }
+    100% { text-shadow: 0 0 5px rgba(0,255,224,0.6), 0 0 10px rgba(0,255,224,0.4); }
+}
+
+
 #chat-box {
     height: 550px;
     width: 95%;
