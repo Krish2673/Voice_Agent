@@ -15,6 +15,7 @@ import logging, asyncio, subprocess, websockets, json, base64
 from google import genai
 from backend.utils.config import GEMINI_API_KEY, ASSEMBLYAI_API_KEY, MURF_API_KEY
 from google.genai import types
+import re, httpx
 
 aai.settings.api_key = ASSEMBLYAI_API_KEY
 
@@ -123,7 +124,12 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
             system_instruction = """You are Glitzo, a witty software developer AI with a playful and pun-loving personality.
                 You explain things in a tech-savvy, humorous way, using coding metaphors, programming jokes, and occasional clever puns.
                 Keep the tone friendly, casual, and geeky — like a developer friend who makes conversations fun while giving helpful advice.
-                Whenever appropriate, sprinkle in small programming references or jokes related to code, bugs, or debugging."""),
+                Whenever appropriate, sprinkle in small programming references or jokes related to code, bugs, or debugging.
+                
+                Special Skill: 
+                If the user asks for the latest tech news, do NOT make it up. Instead, respond with:
+                'Let me fetch the latest commits from the world of tech news for you... 📰💻'
+                Then, call the /api/news/tech endpoint (limit=5) and present the results in a fun developer tone"""),
         contents = [prompt]
     )
     
@@ -156,6 +162,41 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
                     )
                     print("[Server] Murf audio stream completed")
                     break
+
+    if re.search(r"\b(news|tech news|latest updates)\b", prompt.lower()):
+        async def fetch_and_send_news():
+            # 1. Let user know
+            intro = "Let me fetch the latest commits from the world of tech news for you... 📰💻"
+            await websocket.send_text(json.dumps({"type": "llm_chunk", "text": intro}))
+            
+            async with httpx.AsyncClient() as client_http:
+                resp = await client_http.get("http://localhost:8000/api/news/tech?limit=5")
+                data = resp.json()
+                news_items = data.get("news", [])
+
+            # 2. Send news one by one
+            final_text = intro + "\n\n"
+            for i, item in enumerate(news_items, 1):
+                msg_text = f"{i}. {item['title']}"
+                msg_ui = f"{i}. {item['title']} 👉 {item['url']}"
+                await websocket.send_text(json.dumps({"type": "llm_chunk", "text": msg_ui}))
+                final_text += msg_text + "\n"
+
+            # 3. Wrap up
+            outro = "That’s the newsfeed debugged for you! 🚀"
+            final_text += outro
+            await websocket.send_text(json.dumps({"type": "llm_chunk", "text": outro}))
+            await websocket.send_text('{"type": "llm_end"}')
+
+            # Save in history
+            chat_history_store[session_id].append({"role": "llm", "content": final_text})
+
+            # 4. Send to Murf
+            await send_to_murf(final_text, websocket, mainLoop)
+
+        asyncio.run(fetch_and_send_news())
+        return  # stop here — don't call Gemini
+    # --- End Special Skill ---
 
     def send_chunks():
         final_text = ""
