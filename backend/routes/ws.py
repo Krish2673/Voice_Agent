@@ -163,28 +163,42 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
                     print("[Server] Murf audio stream completed")
                     break
 
-    if re.search(r"\b(news|tech news|latest updates)\b", prompt.lower()):
+    if re.search(r"\b(news|tech news|latest updates|headlines)\b", prompt.lower()):
         async def fetch_and_send_news():
             # 1. Let user know
             intro = "Let me fetch the latest commits from the world of tech news for you... 📰💻"
             await websocket.send_text(json.dumps({"type": "llm_chunk", "text": intro}))
             
             async with httpx.AsyncClient() as client_http:
-                resp = await client_http.get("http://localhost:8000/api/news/tech?limit=5")
+                resp = await client_http.get("http://localhost:8000/api/news/tech?limit=5&randomize=true")
                 data = resp.json()
                 news_items = data.get("news", [])
 
             # 2. Send news one by one
             final_text = intro + "\n\n"
+            murf_text = intro + "\n\n"
+
             for i, item in enumerate(news_items, 1):
-                msg_text = f"{i}. {item['title']}"
-                msg_ui = f"{i}. {item['title']} 👉 {item['url']}"
+                title = item['title']
+                url = item['url']
+
+                # msg_text = f"{i}. {item['title']}"
+                msg_ui = f'{i}. <a href="{url}" target="_blank" style="color: #FFD700; text-decoration: underline;">{title}</a>'
                 await websocket.send_text(json.dumps({"type": "llm_chunk", "text": msg_ui}))
-                final_text += msg_text + "\n"
+                final_text += msg_ui + "\n\n"
+
+                summary_resp = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=[f"Summarize this news headline in 1-2 short, friendly sentences: {title}"]
+                )
+                summary = summary_resp.text.strip() if summary_resp.text else title
+
+                murf_text += f"{i}. {summary}...\n\n"
 
             # 3. Wrap up
             outro = "That’s the newsfeed debugged for you! 🚀"
             final_text += outro
+            murf_text += outro
             await websocket.send_text(json.dumps({"type": "llm_chunk", "text": outro}))
             await websocket.send_text('{"type": "llm_end"}')
 
@@ -192,7 +206,7 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
             chat_history_store[session_id].append({"role": "llm", "content": final_text})
 
             # 4. Send to Murf
-            await send_to_murf(final_text, websocket, mainLoop)
+            await send_to_murf(murf_text, websocket, mainLoop)
 
         asyncio.run(fetch_and_send_news())
         return  # stop here — don't call Gemini

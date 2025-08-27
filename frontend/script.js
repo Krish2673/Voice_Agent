@@ -146,12 +146,13 @@ recordBtn.addEventListener('click', () => {
 
 async function startRecording() {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true
+        stream = await navigator.mediaDevices.getUserMedia({ audio: {
+            noiseSuppression :true,
+            echoCancellation : true,
+            autoGainControl : true
+        }
                 // channelCount : 1,
                 // sampleRate : 16000,
-                // noiseSuppression :true,
-                // echoCancellation : true,
-                // autoGainControl : true
             // } 
         });
         audioContext = new AudioContext({ sampleRate: 16000 });
