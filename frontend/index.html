@@ -21,6 +21,25 @@
 
         <audio id="audio-player" controls></audio>
     </div>
+    
+    <button id="settings-btn" class="settings-btn">⚙️</button>
+
+    <div id="settings-modal" class="modal">
+    <div class="modal-content">
+        <span id="close-modal" class="close">&times;</span>
+        <h2>API Key Configuration</h2>
+        <label>Gemini API Key</label>
+        <input type="password" id="gemini-key" placeholder="Enter Gemini API Key" />
+
+        <label>Murf API Key</label>
+        <input type="password" id="murf-key" placeholder="Enter Murf API Key" />
+
+        <label>AssemblyAI API Key</label>
+        <input type="password" id="assembly-key" placeholder="Enter AssemblyAI API Key" />
+
+        <button id="save-keys">Save Keys</button>
+    </div>
+    </div>
 
     <script src="/static/script.js"></script>
 </body>

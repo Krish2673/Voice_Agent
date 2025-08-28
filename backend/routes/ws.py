@@ -35,6 +35,20 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
     if session_id not in chat_history_store:
         chat_history_store[session_id] = []
 
+    user_keys = {
+        "gemini": GEMINI_API_KEY,
+        "murf": MURF_API_KEY,
+        "assembly": ASSEMBLYAI_API_KEY,
+    }
+
+    async def handle_config(msg):
+        nonlocal user_keys
+        if "keys" in msg:
+            for k, v in msg["keys"].items():
+                if v:  # override only if user entered
+                    user_keys[k] = v
+            logger.info(f"Updated API keys for session {session_id}")
+
     client = StreamingClient(
     StreamingClientOptions(api_key=aai.settings.api_key)
     )
@@ -104,6 +118,11 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
             elif "text" in data:
                 msg = data["text"]
                 logger.info(f"Text msg from {session_id}: {msg}")
+                
+                if isinstance(msg, dict) and msg.get("type") == "config_keys":
+                    await handle_config(msg)
+                    continue
+                
                 if msg == "end_of_audio":
                     await websocket.send_text(json.dumps({"type": "end_of_audio"}))
                     await asyncio.to_thread(client.disconnect)

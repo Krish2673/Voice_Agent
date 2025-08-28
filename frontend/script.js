@@ -8,6 +8,29 @@ let isRecording = false;
 let isPlaying = false;
 let audioContext, source, processor, stream;
 
+// Modal logic
+const settingsBtn = document.getElementById("settings-btn");
+const modal = document.getElementById("settings-modal");
+const closeModal = document.getElementById("close-modal");
+const saveKeysBtn = document.getElementById("save-keys");
+
+settingsBtn.onclick = () => { modal.style.display = "flex"; };
+closeModal.onclick = () => { modal.style.display = "none"; };
+window.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+
+saveKeysBtn.onclick = () => {
+  const geminiKey = document.getElementById("gemini-key").value;
+  const murfKey = document.getElementById("murf-key").value;
+  const assemblyKey = document.getElementById("assembly-key").value;
+
+  if (geminiKey) localStorage.setItem("geminiKey", geminiKey);
+  if (murfKey) localStorage.setItem("murfKey", murfKey);
+  if (assemblyKey) localStorage.setItem("assemblyKey", assemblyKey);
+
+  alert("API Keys saved!");
+  modal.style.display = "none";
+};
+
 let session_id = new URLSearchParams(window.location.search).get("session_id");
 if(!session_id) {
     session_id = Math.random().toString(36).substring(2,10);
@@ -28,6 +51,13 @@ function initSocket() {
 
     socket.onopen = () => {
         console.log("Websocket Connected!");
+
+        const keys = {
+            gemini: localStorage.getItem("geminiKey"),
+            murf: localStorage.getItem("murfKey"),
+            assembly: localStorage.getItem("assemblyKey"),
+        };
+        socket.send(JSON.stringify({ type: "config_keys", keys }));
     };
 
     socket.onmessage = (event) => {

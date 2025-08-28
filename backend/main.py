@@ -15,5 +15,5 @@ app.include_router(news.router, prefix = "/api")
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
-    with open("frontend/index.html", "r") as f:
+    with open("frontend/index.html", "r", encoding = "utf-8") as f:
         return f.read()
