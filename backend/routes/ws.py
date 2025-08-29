@@ -13,19 +13,19 @@ from assemblyai.streaming.v3 import (
 )
 import logging, asyncio, subprocess, websockets, json, base64
 from google import genai
-from backend.utils.config import GEMINI_API_KEY, ASSEMBLYAI_API_KEY, MURF_API_KEY
+# from backend.utils.config import GEMINI_API_KEY, ASSEMBLYAI_API_KEY, MURF_API_KEY
 from google.genai import types
 import re, httpx
 
-aai.settings.api_key = ASSEMBLYAI_API_KEY
+# aai.settings.api_key = ASSEMBLYAI_API_KEY
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-MURF_WS_URL = f"wss://api.murf.ai/v1/speech/stream-input?api_key={MURF_API_KEY}" 
 STATIC_CONTEXT_ID = "day23-convo-agent"
 
 chat_history_store = {}
+user_keys = {}
 
 @router.websocket("/agent/chat/{session_id}")
 async def websocket_chat(websocket : WebSocket, session_id : str):
@@ -36,9 +36,9 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
         chat_history_store[session_id] = []
 
     user_keys = {
-        "gemini": GEMINI_API_KEY,
-        "murf": MURF_API_KEY,
-        "assembly": ASSEMBLYAI_API_KEY,
+        "gemini": None,
+        "murf": None,
+        "assembly": None,
     }
 
     async def handle_config(msg):
@@ -49,8 +49,23 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
                     user_keys[k] = v
             logger.info(f"Updated API keys for session {session_id}")
 
+        if not all(user_keys.values()):
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "text": "Missing API keys. Please provide Gemini, AssemblyAI, and Murf keys before continuing."
+            }))
+            return False
+        return True
+    
+    if not user_keys["assembly"]:
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "text": "AssemblyAI key missing. Please configure your API keys."
+        }))
+        return
+
     client = StreamingClient(
-    StreamingClientOptions(api_key=aai.settings.api_key)
+    StreamingClientOptions(api_key = user_keys["assembly"])
     )
 
     mainLoop = asyncio.get_event_loop()
@@ -132,7 +147,17 @@ async def websocket_chat(websocket : WebSocket, session_id : str):
         logger.info(f"Client {session_id} disconnected")
 
 def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, mainLoop):
-    client = genai.Client(api_key = GEMINI_API_KEY)
+    if not user_keys["gemini"]:
+        asyncio.run_coroutine_threadsafe(
+            websocket.send_text(json.dumps({
+                "type": "error",
+                "text": "Gemini API key missing. Please configure your API keys."
+            })),
+            mainLoop
+        )
+        return
+    
+    client = genai.Client(api_key = user_keys["gemini"])
 
     conversation = chat_history_store.get(session_id, [])
     conversation.append({"role" : "user", "content" : prompt})
@@ -153,6 +178,15 @@ def stream_llm_response(session_id : str, prompt : str, websocket : WebSocket, m
     )
     
     async def send_to_murf(text : str, websocket : WebSocket, mainLoop):
+        if not user_keys["murf"]:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "text": "Murf API key missing. Please configure your API keys."
+            }))
+            return
+    
+        MURF_WS_URL = f"wss://api.murf.ai/v1/speech/stream-input?api_key={user_keys['murf']}" 
+
         async with websockets.connect(MURF_WS_URL) as ws:
             await ws.send(json.dumps({
                 "context_id": STATIC_CONTEXT_ID,

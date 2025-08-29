@@ -6,4 +6,9 @@ assemblyai
 google
 pydantic
 pathlib
-typing
+typing    
+websockets                 
+httpx
+python-dotenv
+requests
+google-genai
