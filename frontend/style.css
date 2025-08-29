@@ -200,3 +200,82 @@ body {
   cursor: pointer;
   align-self: flex-end;
 }
+
+/* 📱 Mobile & Tablet Responsiveness */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+
+  .chat-container {
+    width: 90%;
+    max-width: 800px;
+    height: 100vh;              /* full viewport height */
+    max-height: 100vh;          /* prevents overflow */
+    padding: 20px;
+    box-sizing: border-box;     /* includes padding in height */
+    display: flex;
+    flex-direction: column;     /* stack header, chat, footer */
+    }
+
+
+  #bot-name {
+    font-size: 28px;
+  }
+
+  #bot-desc {
+    font-size: 14px;
+  }
+
+  #chat-box {
+    height: 400px;
+    margin: 15px 0;
+  }
+
+  .record-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 18px;
+  }
+
+  .settings-btn {
+    top: 15px;
+    right: 15px;
+    font-size: 16px;
+    padding: 8px 12px;
+  }
+
+  .modal-content {
+    width: 90%;
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 480px) {
+  #bot-name {
+    font-size: 22px;
+  }
+
+  #chat-box {
+    flex: 1;                   /* take remaining space */
+    overflow-y: auto;          /* scroll when needed */
+    margin: 15px 0;
+    }
+
+
+  .message {
+    font-size: 14px;
+    max-width: 90%;
+  }
+
+  .record-btn {
+    width: 45px;
+    height: 45px;
+    font-size: 16px;
+  }
+
+  .settings-btn {
+    font-size: 14px;
+    padding: 6px 10px;
+  }
+}
